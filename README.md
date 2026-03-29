@@ -233,3 +233,19 @@ A flag in `include\Config.h` activates time measurements. It is necessary to unc
 
 # 9. Calibration
 You can find a tutorial for visual-inertial calibration and a detailed description of the contents of valid configuration files at  `Calibration_Tutorial.pdf`
+
+# 10. Docker & VS Code Dev Container Setup
+This repository is configured with a fully automated Docker Dev Container to safely compile ORB_SLAM3 with all system dependencies natively isolated.
+
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) installed on your Linux host.
+- [Visual Studio Code](https://code.visualstudio.com/) with the "Dev Containers" extension (`ms-vscode-remote.remote-containers`) installed.
+
+### Build and Run Instructions
+1. Open the `ORB_SLAM3` folder inside Visual Studio Code.
+2. Open the Command Palette (`Ctrl+Shift+P` / `F1`) and run **Dev Containers: Reopen in Container**. Docker will automatically pull an Ubuntu 22.04 image, compile Pangolin from source, and configure the necessary display bindings.
+3. Once the environment loads, compile the core dependencies by hitting `Ctrl+Shift+B` and running the **Build Thirdparty Environment** task.
+4. Finally, hit `Ctrl+Shift+B` again to run either **Build ORB_SLAM3 (Release)** (for real-time performance) or **Build ORB_SLAM3 (Debug)** (for step-by-step GDB inspection).
+5. (Optional): If you compile in Debug mode, select the `(gdb) Launch` configuration in the Run & Debug pane to attach to the Mono EuRoC example and step through the tracking!
+
+*Note: The Dev Container is equipped with `LIBGL_ALWAYS_SOFTWARE=1` by default to completely bypass X11 GPU-driver lockups native to Docker.*
