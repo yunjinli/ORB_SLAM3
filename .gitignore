@@ -92,3 +92,7 @@ borrar/*
 
 */ExecMean.txt
 MH01/
+
+Examples_ROS2/build/
+Examples_ROS2/install/
+Examples_ROS2/log/

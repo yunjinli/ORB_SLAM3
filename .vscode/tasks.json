@@ -33,6 +33,16 @@
             },
             "group": "build",
             "problemMatcher": "$gcc"
+        },
+        {
+            "label": "Build ROS2 Wrapper",
+            "type": "shell",
+            "command": "cd Examples_ROS2 && colcon build --symlink-install",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": "$gcc"
         }
     ]
 }

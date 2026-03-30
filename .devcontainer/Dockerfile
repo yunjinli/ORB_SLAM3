@@ -26,6 +26,15 @@ RUN apt-get update && apt-get install -y \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
+# Install ROS2 Humble
+RUN apt-get update && apt-get install -y software-properties-common curl \
+    && add-apt-repository universe \
+    && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y ros-humble-ros-base ros-humble-cv-bridge ros-humble-sensor-msgs ros-humble-image-transport python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/*
+
 # Add a non-root user (good practice for vscode dev containers)
 ARG USERNAME=vscode
 ARG USER_UID=1000
@@ -39,11 +48,16 @@ RUN groupadd --gid $USER_GID $USERNAME \
 WORKDIR /tmp
 RUN git clone -b v0.6 https://github.com/stevenlovegrove/Pangolin.git && \
     cd Pangolin && \
+    sed -i '1i#include <limits>' include/pangolin/gl/colour.h && \
     mkdir build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PANGOLIN_PYTHON=OFF && \
     make -j$(nproc) && \
     make install && \
     cd /tmp && rm -rf Pangolin
 
 USER $USERNAME
 WORKDIR /workspaces/ORB_SLAM3
+
+# Source ROS2 automatically in the terminal
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc \
+    && echo "if [ -f /workspaces/ORB_SLAM3/Examples_ROS2/install/setup.bash ]; then source /workspaces/ORB_SLAM3/Examples_ROS2/install/setup.bash; fi" >> ~/.bashrc
