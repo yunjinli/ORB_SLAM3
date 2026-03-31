@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
     libeigen3-dev \
     libssl-dev \
     libboost-serialization-dev \
+    python3 \
+    python3-pip \
     python3-dev \
     python3-numpy \
     libavcodec-dev \
@@ -32,7 +34,7 @@ RUN apt-get update && apt-get install -y software-properties-common curl \
     && curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null \
     && apt-get update \
-    && apt-get install -y ros-humble-ros-base ros-humble-cv-bridge ros-humble-sensor-msgs ros-humble-image-transport python3-colcon-common-extensions \
+    && apt-get install -y ros-humble-ros-base ros-humble-cv-bridge ros-humble-sensor-msgs ros-humble-image-transport ros-humble-rmw-cyclonedds-cpp python3-colcon-common-extensions \
     && rm -rf /var/lib/apt/lists/*
 
 # Add a non-root user (good practice for vscode dev containers)
@@ -54,6 +56,10 @@ RUN git clone -b v0.6 https://github.com/stevenlovegrove/Pangolin.git && \
     make -j$(nproc) && \
     make install && \
     cd /tmp && rm -rf Pangolin
+
+RUN pip install "rerun-sdk==0.16.1" "numpy<2"
+
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 USER $USERNAME
 WORKDIR /workspaces/ORB_SLAM3
