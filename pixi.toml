@@ -1,0 +1,64 @@
+[workspace]
+channels = ["conda-forge", "robostack-humble"]
+name = "ORB_SLAM3"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[system-requirements]
+libc = { family = "glibc", version = "2.31" }
+
+[dependencies]
+# Basic Build Tools (replacing build-essential, cmake, etc.)
+gcc_linux-64 = "11.*"
+gxx_linux-64 = "11.*"
+cmake = ">=3.20"
+make = "*"
+pkg-config = "*"
+git = "*"
+curl = "*"
+wget = "*"
+unzip = "*"
+gdb = "*"
+
+# C++ Libraries
+glew = "*"
+opencv = "*"
+eigen = "3.*"
+openssl = "*"
+boost = "*"
+ffmpeg = "*"
+gtk2 = "*"
+
+# Python Environment
+python = "3.9.*"
+
+# ROS2 Humble Core (via Robostack)
+ros-humble-ros-base = "*"
+ros-humble-cv-bridge = "*"
+ros-humble-sensor-msgs = "*"
+ros-humble-image-transport = "*"
+ros-humble-rmw-cyclonedds-cpp = "*"
+colcon-common-extensions = "*"
+libgl-devel = ">=1.7.0,<2"
+libglu = ">=9.0.3,<10"
+
+[pypi-dependencies]
+rerun-sdk = "*"
+numpy = "<2"
+
+[tasks]
+# Task to compile and install Pangolin v0.6 directly into the Pixi environment
+build-pangolin = { cmd = "chmod +x build_pangolin.sh && ./build_pangolin.sh" }
+
+# Standard ORB-SLAM3 build script
+build-all = { cmd = "chmod +x build.sh && bash build.sh" }
+
+build-orbslam3-debug = { cmd = "mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Debug && make -j$(nproc)" }
+build-orbslam3-release = { cmd = "mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)" }
+
+# ROS2 node build task
+build-ros2 = { cmd = "cd Examples_ROS2 && colcon build --symlink-install" }
+
+[activation]
+# Automatically source the local ROS2 workspace if it exists when entering the shell
+scripts = ["source_local_ros.sh"]
