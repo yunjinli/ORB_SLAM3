@@ -104,3 +104,5 @@ rgbd_dataset_freiburg3_long_office_household
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+Pangolin
