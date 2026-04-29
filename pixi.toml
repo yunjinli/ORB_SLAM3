@@ -37,10 +37,16 @@ ros-humble-ros-base = "*"
 ros-humble-cv-bridge = "*"
 ros-humble-sensor-msgs = "*"
 ros-humble-image-transport = "*"
-ros-humble-rmw-cyclonedds-cpp = "*"
+# ros-humble-rmw-cyclonedds-cpp = "*"
+# ros-humble-rmw-fastrtps-cpp = "*"
 colcon-common-extensions = "*"
 libgl-devel = ">=1.7.0,<2"
 libglu = ">=9.0.3,<10"
+lz4-c = ">=1.10.0,<2"
+# ros-humble-rmw-fastrtps-cpp = "*"
+# ros-humble-foonathan-memory-vendor = ">=1.2.0,<2"
+# foonathan-memory = "0.7.1.*"
+ros-humble-rmw-cyclonedds-cpp = "*"
 
 [pypi-dependencies]
 rerun-sdk = "*"
@@ -63,3 +69,9 @@ build-ros2 = { cmd = "cd Examples_ROS2 && colcon build --symlink-install" }
 [activation]
 # Automatically source the local ROS2 workspace if it exists when entering the shell
 scripts = ["source_local_ros.sh"]
+
+[activation.env]
+# Change this from cyclonedds to fastrtps
+# RMW_IMPLEMENTATION = "rmw_fastrtps_cpp"
+RMW_IMPLEMENTATION = "rmw_cyclonedds_cpp"
+
