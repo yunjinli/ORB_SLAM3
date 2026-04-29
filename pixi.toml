@@ -45,6 +45,7 @@ libglu = ">=9.0.3,<10"
 [pypi-dependencies]
 rerun-sdk = "*"
 numpy = "<2"
+rosbags = ">=0.9.23, <0.10"
 
 [tasks]
 # Task to compile and install Pangolin v0.6 directly into the Pixi environment

@@ -8,6 +8,7 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <std_msgs/msg/header.hpp>
 #include <sophus/se3.hpp>
 #include <cmath>
@@ -59,6 +60,8 @@ public:
         m_path_pub = this->create_publisher<nav_msgs::msg::Path>("orb_slam3/camera_trajectory", 10);
         m_frustum_pub = this->create_publisher<visualization_msgs::msg::Marker>("orb_slam3/camera_frustum", 10);
         m_dense_map_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("orb_slam3/dense_points", 10);
+        m_kp_img_pub = this->create_publisher<sensor_msgs::msg::Image>("orb_slam3/keypoint_image", 10);
+        m_kp_assoc_pub = this->create_publisher<sensor_msgs::msg::PointCloud2>("orb_slam3/keypoint_associations", 10);
         m_path.header.frame_id = "map";
         m_tf_broadcaster = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
@@ -93,7 +96,9 @@ private:
             if (m_SLAM->GetTrackingState() == 2) {
                 PublishPose(Tcw, msgRGB->header);
                 PublishMapPoints(msgRGB->header);
-                
+                PublishKeypointImage(cv_ptrRGB->image, msgRGB->header);
+                PublishKeypointAssociations(msgRGB->header);
+
                 // Publish dense geometry explicitly!
                 PublishDensePointCloud(cv_ptrRGB->image, depthmap, Tcw, msgRGB->header);
             }
@@ -166,7 +171,9 @@ private:
     }
 
     void PublishMapPoints(const std_msgs::msg::Header& header) {
-        std::vector<ORB_SLAM3::MapPoint*> mps = m_SLAM->GetTrackedMapPoints();
+        // Full accumulated sparse map — all MapPoints across all keyframes.
+        std::vector<ORB_SLAM3::MapPoint*> mps =
+            m_SLAM->GetAtlas()->GetCurrentMap()->GetAllMapPoints();
         if (mps.empty()) return;
 
         sensor_msgs::msg::PointCloud2 cloud;
@@ -176,17 +183,15 @@ private:
         cloud.width = 0;
         cloud.is_dense = false;
         cloud.is_bigendian = false;
-        
+
         sensor_msgs::msg::PointField f_x, f_y, f_z;
         f_x.name = "x"; f_x.offset = 0; f_x.datatype = sensor_msgs::msg::PointField::FLOAT32; f_x.count = 1;
         f_y.name = "y"; f_y.offset = 4; f_y.datatype = sensor_msgs::msg::PointField::FLOAT32; f_y.count = 1;
         f_z.name = "z"; f_z.offset = 8; f_z.datatype = sensor_msgs::msg::PointField::FLOAT32; f_z.count = 1;
         cloud.fields = {f_x, f_y, f_z};
         cloud.point_step = 12;
-        cloud.row_step = 0;
 
         cloud.data.reserve(mps.size() * 12);
-        
         for (auto mp : mps) {
             if (mp && !mp->isBad()) {
                 Eigen::Vector3f pos = mp->GetWorldPos();
@@ -214,6 +219,68 @@ private:
     // Dense Mapping Data:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_dense_map_pub;
     float m_fx, m_fy, m_cx, m_cy, m_depthMapFactor;
+
+    // Sparse keypoint / map-point data:
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr m_kp_img_pub;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr m_kp_assoc_pub;
+
+    // Draws tracked keypoints (that have a valid 3D map point) on the RGB frame
+    // and publishes as an Image for RViz Image display.
+    void PublishKeypointImage(const cv::Mat& imRGB, const std_msgs::msg::Header& header) {
+        cv::Mat vis;
+        cv::cvtColor(imRGB, vis, cv::COLOR_RGB2BGR);
+
+        auto mps = m_SLAM->GetTrackedMapPoints();
+        auto kps = m_SLAM->GetTrackedKeyPointsUn();
+
+        for (size_t i = 0; i < mps.size(); ++i) {
+            if (mps[i] && !mps[i]->isBad())
+                cv::circle(vis, kps[i].pt, 3, cv::Scalar(0, 255, 0), -1);
+        }
+
+        auto msg = cv_bridge::CvImage(header, "bgr8", vis).toImageMsg();
+        m_kp_img_pub->publish(*msg);
+    }
+
+    // Publishes a PointCloud2 where each point carries:
+    //   u, v  — 2-D pixel (undistorted) in the current frame
+    //   x, y, z — 3-D world position of the corresponding MapPoint
+    // Index order matches GetTrackedMapPoints() / GetTrackedKeyPointsUn().
+    void PublishKeypointAssociations(const std_msgs::msg::Header& header) {
+        auto mps = m_SLAM->GetTrackedMapPoints();
+        auto kps = m_SLAM->GetTrackedKeyPointsUn();
+
+        sensor_msgs::msg::PointCloud2 cloud;
+        cloud.header = header;
+        cloud.header.frame_id = "map";
+        cloud.height = 1;
+        cloud.is_dense = false;
+        cloud.is_bigendian = false;
+
+        auto make_field = [](const std::string& name, uint32_t offset) {
+            sensor_msgs::msg::PointField f;
+            f.name = name; f.offset = offset;
+            f.datatype = sensor_msgs::msg::PointField::FLOAT32; f.count = 1;
+            return f;
+        };
+        cloud.fields = {
+            make_field("u",  0), make_field("v",  4),
+            make_field("x",  8), make_field("y", 12), make_field("z", 16)
+        };
+        cloud.point_step = 20;
+        cloud.width = 0;
+
+        for (size_t i = 0; i < mps.size(); ++i) {
+            if (!mps[i] || mps[i]->isBad()) continue;
+            Eigen::Vector3f p = mps[i]->GetWorldPos();
+            float data[5] = { kps[i].pt.x, kps[i].pt.y, p.x(), p.y(), p.z() };
+            const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
+            cloud.data.insert(cloud.data.end(), ptr, ptr + 20);
+            cloud.width++;
+        }
+        cloud.row_step = cloud.width * cloud.point_step;
+        m_kp_assoc_pub->publish(cloud);
+    }
 
     void PublishDensePointCloud(const cv::Mat& imRGB, const cv::Mat& imDepth, const Sophus::SE3f& Tcw, const std_msgs::msg::Header& header) {
         sensor_msgs::msg::PointCloud2 cloud;
@@ -301,7 +368,7 @@ int main(int argc, char **argv)
 
     RCLCPP_INFO(setup_node->get_logger(), "Initializing ORB_SLAM3 backend...");
     // Create SLAM system instance specifically tailored for RGBD tracking sequences!
-    ORB_SLAM3::System SLAM(vocab_file, settings_file, ORB_SLAM3::System::RGBD, true);
+    ORB_SLAM3::System SLAM(vocab_file, settings_file, ORB_SLAM3::System::RGBD, false);
 
     auto rgbd_node = std::make_shared<RgbdNode>(&SLAM, settings_file);
     
